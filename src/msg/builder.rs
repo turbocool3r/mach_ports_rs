@@ -1,10 +1,10 @@
 //! Contains the implementation of the `MsgBuilder` structure used to build Mach messages.
 
-use super::{buffer::MsgBuffer, MachMsgBits};
 use crate::{
     msg::{
+        buffer::MsgBuffer,
         parser::{self, TransmutedMsgDesc},
-        MsgId,
+        MachMsgBits, MsgId,
     },
     rights::*,
     traits::{AsRawName, IntoRawName},
@@ -227,18 +227,8 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
 
     /// Appends a port descriptor to the message that will contain a receive, a send or a send once
     /// right. One sender's reference for the right is consumed when the message is sent.
-    pub fn append_moved_right<T: Into<AnyRight>>(&mut self, right: T) {
-        let desc = match right.into() {
-            AnyRight::Receive(right) => {
-                mach_msg_port_descriptor_t::new(right.into_raw_name(), MACH_MSG_TYPE_MOVE_RECEIVE)
-            }
-            AnyRight::Send(right) => {
-                mach_msg_port_descriptor_t::new(right.into_raw_name(), MACH_MSG_TYPE_MOVE_SEND)
-            }
-            AnyRight::SendOnce(right) => {
-                mach_msg_port_descriptor_t::new(right.into_raw_name(), MACH_MSG_TYPE_MOVE_SEND_ONCE)
-            }
-        };
+    pub fn append_moved_right<T: IntoRawName>(&mut self, right: T) {
+        let desc = mach_msg_port_descriptor_t::new(right.into_raw_name(), T::MSG_TYPE);
 
         self.append_descriptor(unsafe { anything_as_bytes(&desc) });
     }

@@ -115,6 +115,8 @@ impl Drop for SendRight {
 }
 
 impl AsRawName for SendRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND;
+
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
         self.0
@@ -166,6 +168,8 @@ impl Drop for SendOnceRight {
 }
 
 impl AsRawName for SendOnceRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND_ONCE;
+
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
         self.0
@@ -274,6 +278,8 @@ impl Drop for RecvRight {
 }
 
 impl AsRawName for RecvRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_RECEIVE;
+
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
         self.0
@@ -307,38 +313,6 @@ impl From<SendOnceRight> for AnySendRight {
     #[inline]
     fn from(right: SendOnceRight) -> Self {
         AnySendRight::SendOnce(right)
-    }
-}
-
-/// An enum for all available rights.
-#[derive(Debug)]
-pub enum AnyRight {
-    /// A receive right.
-    Receive(RecvRight),
-    /// A send right.
-    Send(SendRight),
-    /// A send once right.
-    SendOnce(SendOnceRight),
-}
-
-impl From<RecvRight> for AnyRight {
-    #[inline]
-    fn from(right: RecvRight) -> Self {
-        AnyRight::Receive(right)
-    }
-}
-
-impl From<SendRight> for AnyRight {
-    #[inline]
-    fn from(right: SendRight) -> Self {
-        AnyRight::Send(right)
-    }
-}
-
-impl From<SendOnceRight> for AnyRight {
-    #[inline]
-    fn from(right: SendOnceRight) -> Self {
-        AnyRight::SendOnce(right)
     }
 }
 
