@@ -4,10 +4,10 @@
 
 Mach ports are a powerful IPC mechanism used for most of the low-level 
 communications between processes and kernel on Darwin. I/O Kit, largely
-the only way to communicate with XNU drivers, and XPC, the most 
-widespread userspace IPC mechanism, are both built using the Mach ports.
-Exposing low-level APIs on these systems in a safe way requires 
-abstractions `mach_rs` library aims to provide.
+the only way to communicate with kernel drivers on these platforms, and 
+XPC, the most widespread userspace IPC mechanism, are both built using 
+the Mach ports. Exposing low-level APIs on these systems in a safe way 
+requires abstractions `mach_rs` library aims to provide.
 
 ## Mach port name wrappers
 
@@ -20,7 +20,7 @@ file descriptors, these refer to one or multiple "rights" on a port:
 * `MACH_PORT_RIGHT_PORT_SET`: Allows to receive messages from multiple ports in one call. Currently `mach_rs` does not support port sets.
 * `MACH_PORT_RIGHT_DEAD_NAME`: Rights may be converted to dead names under certain conditions (e.g. when a receive right is destroyed, send rights become dead name rights). These may also be created manually.
 
-While send and receive rights, for example, are referenced by the same name inside the same process (IPC space) the reference counts for the rights are managed separately. `mach_rs` makes this distinction on the type level by providing 3 wrappers for Mach port names:
+While send and receive rights, for example, are referenced by the same name inside the same process (IPC space) the reference counts for the rights are managed separately. `mach_rs` makes this distinction on the type level by providing 3 wrappers for Mach port names (there is no need to represent dead names separately):
 
 * `SendRight` wraps a name that holds a reference on a send right. These may be cloned by incrementing the send right's reference count and decrement the latter when dropped.
 * `RecvRight` wraps a name that holds a reference on a receive right. These may not be cloned and destroy the receive right when dropped by decrementing its only reference.
