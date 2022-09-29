@@ -33,3 +33,7 @@ Mach message format is quite non-trivial. All Mach messages start with a fixed-s
 ![Complex Mach message format diagram](img/complex_mach_message.svg)
 
 `mach_rs` provides data structures that can be used to build and parse such messages. See docs for the `msg` module for more info.
+
+## License
+
+`mach_rs` is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
