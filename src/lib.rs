@@ -2,6 +2,8 @@
 #![feature(pointer_is_aligned)]
 #![feature(const_option)]
 #![warn(missing_docs)]
+#![warn(missing_debug_implementations)]
+#![warn(missing_copy_implementations)]
 
 pub mod msg;
 pub mod rights;

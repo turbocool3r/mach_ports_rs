@@ -64,6 +64,7 @@ pub(crate) enum TransmutedMsgDesc<'a> {
 }
 
 /// Message body parser.
+#[derive(Debug)]
 pub struct MsgBodyParser<'buffer> {
     buffer: &'buffer mut MsgBuffer,
     offset: mach_msg_size_t,
@@ -83,6 +84,7 @@ impl MsgBodyParser<'_> {
 }
 
 /// Either a descriptor or a body parser.
+#[derive(Debug)]
 pub enum MsgDescOrBodyParser<'buffer> {
     /// A descriptor parser.
     Descriptor(MsgDescParser<'buffer>),
@@ -140,6 +142,7 @@ pub(crate) fn next_desc_impl<'buffer>(
 }
 
 /// A Mach message parser received after parsing the header.
+#[derive(Debug)]
 pub struct MsgDescParser<'buffer> {
     buffer: Option<&'buffer mut MsgBuffer>,
     count: mach_msg_size_t,
@@ -274,6 +277,7 @@ fn parse_header_impl(buffer: &mut MsgBuffer) -> (ParsedMsgHdr, MsgDescOrBodyPars
 
 /// A Mach message parser that can parse Mach message headers and construct subsequent parsers.
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct MsgParser<'buffer>(Option<&'buffer mut MsgBuffer>);
 
 impl<'buffer> MsgParser<'buffer> {

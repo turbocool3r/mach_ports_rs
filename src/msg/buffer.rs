@@ -20,6 +20,7 @@ pub(crate) struct MsgData<T: ?Sized> {
 ///
 /// This structure isn't designed to be aware of the Mach message format and exists to allow reusing
 /// memory when communicating using Mach messages.
+#[derive(Debug)]
 pub struct MsgBuffer {
     ptr: NonNull<MsgData<[u8; 0]>>,
     len: mach_msg_size_t,

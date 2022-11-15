@@ -72,6 +72,7 @@ fn drop_header(header: &mut mach_msg_header_t) {
 /// * `(append|set)_moved_*` functions consume any of the Mach port name wrappers. The reference
 /// count on the corresponding rights aren't changed, but dropping the `MsgBuilder` or sending the
 /// message will cause the sender to pass one reference on the right to the receiver.
+#[derive(Debug)]
 pub struct MsgBuilder<'a, 'buffer> {
     buffer: &'buffer mut MsgBuffer,
     inline_data_off: mach_msg_size_t,

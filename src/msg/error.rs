@@ -52,6 +52,7 @@ macro_rules! def_error_kind {
 
 def_error_kind! {
     /// An error returned when sending a Mach message.
+    #[derive(Copy, Clone, Debug)]
     pub enum SendErrorKind {
         /// Thread is waiting to send.  (Internal use only.)
         InProgress = MACH_SEND_IN_PROGRESS,
@@ -92,6 +93,7 @@ def_error_kind! {
 
 def_error_kind! {
     /// An error returned when receiving a Mach message.
+    #[derive(Copy, Clone, Debug)]
     pub enum RecvErrorKind {
         /// Thread is waiting for receive.  (Internal use only.)
         InProgress = MACH_RCV_IN_PROGRESS,
