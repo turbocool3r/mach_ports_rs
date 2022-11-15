@@ -309,7 +309,7 @@ impl Drop for MsgBuilder<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{msg::MsgDescOrBodyParser, rights::AnySendRight};
+    use crate::rights::AnySendRight;
 
     #[test]
     fn test_drop() {
