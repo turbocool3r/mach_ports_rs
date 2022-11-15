@@ -5,7 +5,7 @@ use crate::{
     traits::*,
 };
 use mach2::{
-    kern_return::{KERN_INVALID_RIGHT, KERN_SUCCESS},
+    kern_return::*,
     mach_port,
     message::*,
     port::{
@@ -17,7 +17,11 @@ use mach2::{
 };
 use std::mem::ManuallyDrop;
 
-fn mod_refs_wrapper(name: mach_port_t, right: mach_port_right_t, delta: mach_port_delta_t) {
+fn mod_refs_wrapper(
+    name: mach_port_t,
+    right: mach_port_right_t,
+    delta: mach_port_delta_t,
+) -> kern_return_t {
     let mut result =
         unsafe { mach_port::mach_port_mod_refs(traps::mach_task_self(), name, right, delta) };
 
@@ -34,7 +38,7 @@ fn mod_refs_wrapper(name: mach_port_t, right: mach_port_right_t, delta: mach_por
         };
     }
 
-    assert_eq!(result, KERN_SUCCESS);
+    result
 }
 
 fn send_impl(name: mach_port_t, msg: MsgBuilder, bits: mach_msg_bits_t) -> Result<(), SendError> {
@@ -75,7 +79,7 @@ impl SendRight {
     }
 
     #[inline(always)]
-    fn mod_refs(&self, delta: mach_port_delta_t) {
+    fn mod_refs(&self, delta: mach_port_delta_t) -> kern_return_t {
         mod_refs_wrapper(self.0, MACH_PORT_RIGHT_SEND, delta)
     }
 
@@ -143,7 +147,7 @@ impl SendOnceRight {
     }
 
     #[inline(always)]
-    fn mod_refs(&self, delta: mach_port_delta_t) {
+    fn mod_refs(&self, delta: mach_port_delta_t) -> kern_return_t {
         mod_refs_wrapper(self.0, MACH_PORT_RIGHT_SEND_ONCE, delta)
     }
 
@@ -265,7 +269,7 @@ impl RecvRight {
     }
 
     #[inline(always)]
-    fn mod_refs(&self, delta: mach_port_delta_t) {
+    fn mod_refs(&self, delta: mach_port_delta_t) -> kern_return_t {
         mod_refs_wrapper(self.0, MACH_PORT_RIGHT_RECEIVE, delta)
     }
 }
