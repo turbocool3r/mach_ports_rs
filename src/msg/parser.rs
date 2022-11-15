@@ -115,7 +115,7 @@ pub(crate) fn next_desc_impl<'buffer>(
     let type_ = type_desc.type_ as mach_msg_descriptor_type_t;
 
     let desc_size = size_for_desc_type(type_);
-    assert!(desc_size <= space_left as usize);
+    assert!(desc_size <= space_left);
     let desc_bytes = &tail[..desc_size];
 
     let transmuted_desc = match type_ {
