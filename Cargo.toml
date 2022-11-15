@@ -13,3 +13,6 @@ readme = "README.md"
 
 [dependencies]
 mach2 = "0.4.1"
+
+[package.metadata.docs.rs]
+default-target = "x86_64-apple-darwin"
