@@ -127,6 +127,15 @@ impl AsRawName for SendRight {
     }
 }
 
+impl<'a> AsRawName for &'a SendRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND;
+
+    #[inline(always)]
+    fn as_raw_name(&self) -> mach_port_t {
+        self.0
+    }
+}
+
 impl IntoRawName for SendRight {
     #[inline(always)]
     fn into_raw_name(self) -> mach_port_t {
@@ -172,6 +181,15 @@ impl Drop for SendOnceRight {
 }
 
 impl AsRawName for SendOnceRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND_ONCE;
+
+    #[inline(always)]
+    fn as_raw_name(&self) -> mach_port_t {
+        self.0
+    }
+}
+
+impl<'a> AsRawName for &'a SendOnceRight {
     const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND_ONCE;
 
     #[inline(always)]
@@ -282,6 +300,15 @@ impl Drop for RecvRight {
 }
 
 impl AsRawName for RecvRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_RECEIVE;
+
+    #[inline(always)]
+    fn as_raw_name(&self) -> mach_port_t {
+        self.0
+    }
+}
+
+impl<'a> AsRawName for &'a RecvRight {
     const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_RECEIVE;
 
     #[inline(always)]
