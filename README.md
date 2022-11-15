@@ -1,5 +1,7 @@
 # mach_rs
 
+[![Crates.io](https://img.shields.io/crates/v/mach_ports.svg)](https://crates.io/crates/mach_ports)
+
 ## Summary
 
 Mach ports are a powerful IPC mechanism used for most of the low-level 
