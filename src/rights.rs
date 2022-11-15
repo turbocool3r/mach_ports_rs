@@ -1,4 +1,15 @@
 //! Provides wrappers for Mach port right names.
+//!
+//! The module provides 3 types [`SendRight`], [`SendOnceRight`] and [`RecvRight`] that are wrappers
+//! for raw `mach_port_t` values (aka Mach port names).
+//!
+//! # Ownership
+//!
+//! Each of these values represent a single user reference on the corresponding right to a Mach
+//! port. That means when a value is dropped, the task loses a reference to the Mach port right
+//! represented by the wrapped name (through a call to `mach_port_mod_refs`). Additionally,
+//! [`SendRight`] wrappers can be cloned which increases the number of references to the port's
+//! send right.
 
 use crate::{
     msg::{MsgBuffer, MsgBuilder, MsgParser, RecvError, SendError},
@@ -98,14 +109,14 @@ impl SendRight {
 impl Clone for SendRight {
     #[inline(always)]
     fn clone(&self) -> Self {
-        self.mod_refs(1);
+        assert_eq!(self.mod_refs(1), KERN_SUCCESS);
 
         SendRight(self.0)
     }
 
     #[inline(always)]
     fn clone_from(&mut self, source: &Self) {
-        source.mod_refs(1);
+        assert_eq!(self.mod_refs(1), KERN_SUCCESS);
 
         self.0 = source.0;
     }
