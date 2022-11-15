@@ -112,6 +112,19 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
 
     /// Sets the reply port right to be made from a receive right when the message is sent. The
     /// receive right stays owned by the sender.
+    ///
+    /// # Example
+    /// ```
+    /// # use mach_ports::{msg::{MsgBuilder, MsgBuffer}, rights::RecvRight};
+    /// # let recv_right = RecvRight::alloc();
+    /// # let mut buffer = MsgBuffer::with_capacity(1024);
+    /// # let mut builder = MsgBuilder::new(&mut buffer);
+    /// // Set the reply port right to be a send once right.
+    /// builder.set_made_reply_port(&recv_right, true);
+    ///
+    /// // Set the reply port right to be a send right created from the receive right.
+    /// builder.set_made_reply_port(&recv_right, false);
+    /// ```
     pub fn set_made_reply_port(&mut self, recv_right: &'a RecvRight, once: bool) {
         self.release_reply_port();
 
