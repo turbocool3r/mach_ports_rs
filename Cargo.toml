@@ -1,9 +1,15 @@
 [package]
-name = "mach_rs"
+name = "mach_ports"
 version = "0.1.0-alpha"
 edition = "2021"
 description = "A library to manage Mach port right references and exchange Mach messages."
+repository = "https://github.com/turbocool3r/mach_ports_rs"
+documentation = "https://docs.rs/mach_ports"
+authors = ["turbocooler <turbocooler@cocaine.ninja>"]
+keywords = ["mach", "mach ports", "darwin"]
+categories = ["api-bindings", "os::macos-apis"]
 license = "MIT OR Apache-2.0"
+readme = "README.md"
 
 [dependencies]
 mach2 = "0.4.1"
