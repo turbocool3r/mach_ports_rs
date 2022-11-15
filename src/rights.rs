@@ -338,11 +338,4 @@ mod tests {
         drop(recv_right);
         drop(send_right);
     }
-
-    #[test]
-    #[should_panic]
-    fn test_double_drop() {
-        let right_1 = RecvRight::alloc();
-        let _right_2 = RecvRight::from_raw_name(right_1.as_raw_name());
-    }
 }
