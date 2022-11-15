@@ -123,7 +123,7 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
             MACH_MSG_TYPE_MAKE_SEND
         };
 
-        header.msgh_remote_port = recv_right.as_raw_name();
+        header.msgh_local_port = recv_right.as_raw_name();
         header.msgh_bits = bits.set_local(local_bits).0;
     }
 
@@ -135,7 +135,7 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
         let header = self.buffer.header_mut();
         let bits = MachMsgBits::from_bits(header.msgh_bits);
 
-        header.msgh_remote_port = name.as_raw_name();
+        header.msgh_local_port = name.as_raw_name();
         header.msgh_bits = bits.set_local(MACH_MSG_TYPE_COPY_SEND).0;
     }
 
@@ -149,11 +149,11 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
         let bits = MachMsgBits::from_bits(header.msgh_bits);
         let local_bits = match reply_port {
             AnySendRight::Send(send) => {
-                header.msgh_remote_port = send.into_raw_name();
+                header.msgh_local_port = send.into_raw_name();
                 MACH_MSG_TYPE_MOVE_SEND
             }
             AnySendRight::SendOnce(send_once) => {
-                header.msgh_remote_port = send_once.into_raw_name();
+                header.msgh_local_port = send_once.into_raw_name();
                 MACH_MSG_TYPE_MOVE_SEND_ONCE
             }
         };
@@ -296,6 +296,7 @@ impl Drop for MsgBuilder<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{msg::MsgDescOrBodyParser, rights::AnySendRight};
 
     #[test]
     fn test_drop() {
@@ -306,5 +307,42 @@ mod tests {
         builder.append_moved_right(RecvRight::alloc());
         builder.append_inline_data(b"0123456");
         builder.insert_inline_data(4, b"1337");
+    }
+
+    #[test]
+    fn test_reply_port_send() {
+        let mut buffer = MsgBuffer::with_capacity(1024);
+        let recv_right = RecvRight::alloc();
+        let send_right = recv_right.make_send();
+        let reply_right = RecvRight::alloc();
+
+        let mut builder = MsgBuilder::new(&mut buffer);
+        builder.set_made_reply_port(&reply_right, false);
+        send_right.send(builder).unwrap();
+
+        let parser = recv_right.recv(&mut buffer).unwrap();
+        let (header, _) = parser.parse_header();
+
+        assert!(matches!(header.reply_right, Some(AnySendRight::Send(_))));
+    }
+
+    #[test]
+    fn test_reply_port_send_once() {
+        let mut buffer = MsgBuffer::with_capacity(1024);
+        let recv_right = RecvRight::alloc();
+        let send_right = recv_right.make_send();
+        let reply_right = RecvRight::alloc();
+
+        let mut builder = MsgBuilder::new(&mut buffer);
+        builder.set_made_reply_port(&reply_right, true);
+        send_right.send(builder).unwrap();
+
+        let parser = recv_right.recv(&mut buffer).unwrap();
+        let (header, _) = parser.parse_header();
+
+        assert!(matches!(
+            header.reply_right,
+            Some(AnySendRight::SendOnce(_))
+        ));
     }
 }
