@@ -96,12 +96,15 @@ mod vm_buf {
         pub fn shrink_to(&mut self, target_capacity: usize) {
             let cur_capacity = self.capacity;
             let page_size = page_size::get_granularity();
+            let offset_in_page = self.ptr.addr().get() % page_size;
 
             assert!(target_capacity <= cur_capacity);
             assert!(page_size.is_power_of_two());
 
-            let aligned_capacity = align_up(cur_capacity, page_size);
-            let aligned_target_capacity = align_up(target_capacity, page_size);
+            let aligned_capacity =
+                align_up(cur_capacity + offset_in_page, page_size) - offset_in_page;
+            let aligned_target_capacity =
+                align_up(target_capacity + offset_in_page, page_size) - offset_in_page;
 
             if aligned_target_capacity < aligned_capacity {
                 let size = (cur_capacity - aligned_target_capacity).try_into().unwrap();
