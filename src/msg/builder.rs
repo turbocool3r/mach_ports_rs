@@ -8,7 +8,7 @@ use crate::{
         MachMsgBits, MsgId,
     },
     rights::*,
-    traits::{AsRawName, IntoRawName},
+    traits::{AsRawName, BaseRight, IntoRawName},
 };
 use mach2::{
     message::*,
@@ -84,12 +84,13 @@ pub enum CopyKind {
 ///
 /// # Right references
 /// This structure accepts Mach port names in three different ways:
-/// * `(append|set)_made_*` functions accept a reference to a `RecvRight` without altering its
+///
+/// * `(append|set)_made_*` functions accept a reference to a receive right without altering its
 /// receive right reference count. When a message is sent, a send or a send once right name is
 /// created in the receiver's IPC space using the receive right supplied by the sender.
-/// * `(append|set)_copied_*` functions accept a reference to a `SendRight` without altering its
-/// send right reference count. When a message is sent, the receiver gets a reference on the send
-/// right and a name is allocated for the port in its IPC space if there wasn't one before.
+/// * `(append|set)_copied_*` functions accept a reference to a send right without altering its
+/// reference count. When a message is sent, the receiver gets a reference on the send right and a
+/// name is allocated for the port in its IPC space if there wasn't one before.
 /// * `(append|set)_moved_*` functions consume any of the Mach port name wrappers. The reference
 /// count on the corresponding rights aren't changed, but dropping the `MsgBuilder` or sending the
 /// message will cause the sender to pass one reference on the right to the receiver.
@@ -146,7 +147,10 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
     /// // Set the reply port right to be a send right created from the receive right.
     /// builder.set_made_reply_port(&recv_right, false);
     /// ```
-    pub fn set_made_reply_port(&mut self, recv_right: &'a RecvRight, once: bool) {
+    pub fn set_made_reply_port<T>(&mut self, recv_right: &'a T, once: bool)
+    where
+        T: AsRawName<Base = RecvRight>,
+    {
         self.release_reply_port();
 
         let header = self.buffer.header_mut();
@@ -163,13 +167,13 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
 
     /// Sets the reply port right to be copied from a send right when the message is sent. The
     /// sender's reference on the send right isn't dropped.
-    pub fn set_copied_reply_port(&mut self, name: &'a SendRight) {
+    pub fn set_copied_reply_port<T: AsRawName<Base = SendRight>>(&mut self, right: &'a T) {
         self.release_reply_port();
 
         let header = self.buffer.header_mut();
         let bits = MachMsgBits::from_bits(header.msgh_bits);
 
-        header.msgh_local_port = name.as_raw_name();
+        header.msgh_local_port = right.as_raw_name();
         header.msgh_bits = bits.set_local(MACH_MSG_TYPE_COPY_SEND).0;
     }
 
@@ -207,6 +211,13 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
         self.inline_data_off += appended_len;
     }
 
+    fn append_port_descriptor(&mut self, name: mach_port_t, disposition: mach_msg_type_name_t) {
+        let desc = mach_msg_port_descriptor_t::new(name, disposition);
+
+        // SAFETY: mach_msg_port_descriptor_t is repr(C) and should contain no padding.
+        self.append_descriptor(unsafe { anything_as_bytes(&desc) });
+    }
+
     /// Increments the descriptor count in the message and reserves the specified amount of bytes
     /// for a descriptor. In case there were no descriptors in the message, the count is inserted
     /// after the header and the complex bit is set.
@@ -241,31 +252,29 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
 
     /// Appends a port descriptor to the message that will contain a send or a send once right to
     /// the port represented by a receive right.
-    pub fn append_made_send_right(&mut self, right: &'a RecvRight, once: bool) {
+    pub fn append_made_send_right<T>(&mut self, recv_right: &'a T, once: bool)
+    where
+        T: AsRawName<Base = RecvRight>,
+    {
         let disposition = if once {
             MACH_MSG_TYPE_MAKE_SEND_ONCE
         } else {
             MACH_MSG_TYPE_MAKE_SEND
         };
-        let desc = mach_msg_port_descriptor_t::new(right.as_raw_name(), disposition);
 
-        self.append_descriptor(unsafe { anything_as_bytes(&desc) });
+        self.append_port_descriptor(recv_right.as_raw_name(), disposition);
     }
 
     /// Appends a port descriptor to the message that will contain a send right to the port
     /// represented by a send right. The provided send right's reference is not consumed.
-    pub fn append_copied_send_right(&mut self, right: &'a SendRight) {
-        let desc = mach_msg_port_descriptor_t::new(right.as_raw_name(), MACH_MSG_TYPE_COPY_SEND);
-
-        self.append_descriptor(unsafe { anything_as_bytes(&desc) });
+    pub fn append_copied_send_right<T: AsRawName<Base = SendRight>>(&mut self, right: &'a T) {
+        self.append_port_descriptor(right.as_raw_name(), MACH_MSG_TYPE_COPY_SEND);
     }
 
     /// Appends a port descriptor to the message that will contain a receive, a send or a send once
     /// right. One sender's reference for the right is consumed when the message is sent.
     pub fn append_moved_right<T: IntoRawName>(&mut self, right: T) {
-        let desc = mach_msg_port_descriptor_t::new(right.into_raw_name(), T::MSG_TYPE);
-
-        self.append_descriptor(unsafe { anything_as_bytes(&desc) });
+        self.append_port_descriptor(right.into_raw_name(), T::Base::MSG_TYPE);
     }
 
     /// Returns a slice with the message contents.

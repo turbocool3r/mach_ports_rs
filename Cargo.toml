@@ -1,6 +1,6 @@
 [package]
 name = "mach_ports"
-version = "0.2.1-alpha"
+version = "0.3.0-alpha"
 edition = "2021"
 description = "A library to manage Mach port right references and exchange Mach messages."
 repository = "https://github.com/turbocool3r/mach_ports_rs"

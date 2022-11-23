@@ -4,11 +4,13 @@ use mach2::port::{mach_port_right_t, mach_port_t};
 
 /// A trait to get a raw Mach port name (`mach_port_t`) from an object.
 pub trait AsRawName {
-    /// Specifies the disposition value to be set in a port descriptor when the represented right
-    /// reference has to be moved to the receiver's IPC space.
+    /// Specifies the right reference type of the extracted name.
     ///
-    /// This should be one of the `MACH_MSG_TYPE_MOVE_*` constants.
-    const MSG_TYPE: mach_port_right_t;
+    /// This may only be one of the base wrapper types:
+    /// [`SendRight`](../rights/struct.SendRight.html),
+    /// [`SendOnceRight`](../rights/struct.SendOnceRight.html) or
+    /// [`RecvRight`](../rights/struct.RecvRight.html).
+    type Base: BaseRight;
 
     /// Extracts the raw Mach port name.
     ///
@@ -31,4 +33,22 @@ pub trait IntoRawName: AsRawName {
     ///
     /// This function should not alter reference counts of the port right represented by the name.
     fn into_raw_name(self) -> mach_port_t;
+}
+
+/// A trait only implemented by the base wrappers: [`SendRight`](../rights/struct.SendRight.html),
+/// [`SendOnceRight`](../rights/struct.SendOnceRight.html) and
+/// [`RecvRight`](../rights/struct.RecvRight.html).
+pub trait BaseRight: IntoRawName + sealed::Sealed {
+    #[doc(hidden)]
+    const MSG_TYPE: mach_port_right_t;
+}
+
+mod sealed {
+    use crate::rights::{RecvRight, SendOnceRight, SendRight};
+
+    pub trait Sealed {}
+
+    impl Sealed for RecvRight {}
+    impl Sealed for SendRight {}
+    impl Sealed for SendOnceRight {}
 }

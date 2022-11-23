@@ -130,7 +130,7 @@ impl Drop for SendRight {
 }
 
 impl AsRawName for SendRight {
-    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND;
+    type Base = SendRight;
 
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
@@ -139,7 +139,7 @@ impl AsRawName for SendRight {
 }
 
 impl<'a> AsRawName for &'a SendRight {
-    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND;
+    type Base = SendRight;
 
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
@@ -152,6 +152,10 @@ impl IntoRawName for SendRight {
     fn into_raw_name(self) -> mach_port_t {
         ManuallyDrop::new(self).0
     }
+}
+
+impl BaseRight for SendRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND;
 }
 
 /// A wrapper for a Mach port name that holds a send once right to a port.
@@ -192,7 +196,7 @@ impl Drop for SendOnceRight {
 }
 
 impl AsRawName for SendOnceRight {
-    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND_ONCE;
+    type Base = SendOnceRight;
 
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
@@ -201,7 +205,7 @@ impl AsRawName for SendOnceRight {
 }
 
 impl<'a> AsRawName for &'a SendOnceRight {
-    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND_ONCE;
+    type Base = SendOnceRight;
 
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
@@ -214,6 +218,10 @@ impl IntoRawName for SendOnceRight {
     fn into_raw_name(self) -> mach_port_t {
         ManuallyDrop::new(self).0
     }
+}
+
+impl BaseRight for SendOnceRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND_ONCE;
 }
 
 /// A wrapper for a Mach port name that holds a receive right to a port.
@@ -311,7 +319,7 @@ impl Drop for RecvRight {
 }
 
 impl AsRawName for RecvRight {
-    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_RECEIVE;
+    type Base = RecvRight;
 
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
@@ -320,7 +328,7 @@ impl AsRawName for RecvRight {
 }
 
 impl<'a> AsRawName for &'a RecvRight {
-    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_RECEIVE;
+    type Base = RecvRight;
 
     #[inline(always)]
     fn as_raw_name(&self) -> mach_port_t {
@@ -333,6 +341,10 @@ impl IntoRawName for RecvRight {
     fn into_raw_name(self) -> mach_port_t {
         ManuallyDrop::new(self).0
     }
+}
+
+impl BaseRight for RecvRight {
+    const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_RECEIVE;
 }
 
 /// An enum for all available send rights.
