@@ -1,6 +1,6 @@
 [package]
 name = "mach_ports"
-version = "0.2.0-alpha1"
+version = "0.2.1-alpha"
 edition = "2021"
 description = "A library to manage Mach port right references and exchange Mach messages."
 repository = "https://github.com/turbocool3r/mach_ports_rs"
@@ -13,6 +13,7 @@ readme = "README.md"
 
 [dependencies]
 mach2 = "0.4.1"
+page_size = "0.5"
 
 [package.metadata.docs.rs]
 default-target = "x86_64-apple-darwin"

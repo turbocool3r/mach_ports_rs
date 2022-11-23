@@ -3,6 +3,7 @@
 use crate::{
     msg::{
         buffer::MsgBuffer,
+        ool::OolBuf,
         parser::{self, TransmutedMsgDesc},
         MachMsgBits, MsgId,
     },
@@ -13,7 +14,7 @@ use mach2::{
     message::*,
     port::{mach_port_t, MACH_PORT_NULL},
 };
-use std::{marker::PhantomData, mem, slice};
+use std::{marker::PhantomData, mem, ptr::NonNull, slice};
 
 /// Converts any sized type into a byte slice.
 ///
@@ -54,6 +55,26 @@ fn drop_header(header: &mut mach_msg_header_t) {
     assert_eq!(bits.remote(), 0);
 
     header.msgh_bits = MachMsgBits::new(bits.complex(), 0, 0, 0).0;
+}
+
+/// The type of memory copy operation requested from the kernel.
+///
+/// This is more of a hint at the callers intent than an instruction to the kernel. The kernel may
+/// still perform a physical copy when a virtual one is requested and vice versa.
+#[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub enum CopyKind {
+    /// Request the kernel to perform a virtual copy of the memory.
+    ///
+    /// That typically means the pages will be mapped into both the sender and receiver tasks with
+    /// copy-on-write semantics. Writing to the copied pages by either the sender or the receiver
+    /// will trigger a physical copy of the modified pages.
+    Virtual = MACH_MSG_VIRTUAL_COPY,
+    /// Request the kernel to perform a physical copy of the memory.
+    ///
+    /// Physical pages are allocated for the receiver task and the memory is physically copied into
+    /// these. The mapping is completely owned by the receiver task.
+    Physical = MACH_MSG_PHYSICAL_COPY,
 }
 
 /// A Mach message builder.
@@ -263,6 +284,38 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
         self.buffer.insert(self.inline_data_off + at, data);
     }
 
+    /// Appends an out-of-line data descriptor to the message.
+    ///
+    /// The pages containing the data slice will be copied into the receiver task on message
+    /// reception, the sender task's mapping's sharing mode may be changed to copy-on-write which
+    /// may affect the performance (see [`CopyKind`] docs).
+    pub fn append_ool_data(&mut self, data: &'a [u8], copy_kind: CopyKind) {
+        let desc = mach_msg_ool_descriptor_t::new(
+            data.as_ptr() as *mut _,
+            false,
+            copy_kind as mach_msg_copy_options_t,
+            data.len().try_into().unwrap(),
+        );
+
+        self.append_descriptor(unsafe { anything_as_bytes(&desc) });
+    }
+
+    /// Appends an out-of-line data descriptor to the message marking the backing virtual memory
+    /// pages to be unmapped from the sender task's address space.
+    ///
+    /// The pages will also be unmapped when the builder is dropped without sending the message.
+    pub fn append_consumed_ool_data(&mut self, data: OolBuf, copy_kind: CopyKind) {
+        let (address, size) = data.into_raw_parts();
+        let desc = mach_msg_ool_descriptor_t::new(
+            address.as_ptr() as *mut _,
+            true,
+            copy_kind as mach_msg_copy_options_t,
+            size.try_into().unwrap(),
+        );
+
+        self.append_descriptor(unsafe { anything_as_bytes(&desc) });
+    }
+
     pub(crate) fn set_raw_remote_port(&mut self, name: mach_port_t, bits: mach_msg_bits_t) {
         let header = self.buffer.header_mut();
         header.msgh_remote_port = name;
@@ -295,8 +348,16 @@ impl Drop for MsgBuilder<'_, '_> {
                         _ => unreachable!("invalid disposition value in a port descriptor"),
                     }
                 }
-                Ool(_) | OolVolatile(_) => {
-                    unimplemented!("OOL descriptors are not yet implemented")
+                Ool(desc) | OolVolatile(desc) => {
+                    // Only deallocate the buffer in case it was meant to be deallocated.
+                    if desc.deallocate != 0 {
+                        let ptr = NonNull::new(desc.address as *mut u8).unwrap();
+                        let length = desc.size.try_into().unwrap();
+
+                        // SAFETY: Since the message was produced by the builder, the address and
+                        // length should be correct.
+                        drop(unsafe { OolBuf::from_raw_parts(ptr, length) })
+                    }
                 }
                 OolPorts(_) => unimplemented!("OOL ports descriptors are not yet implemented"),
             }
@@ -309,7 +370,10 @@ impl Drop for MsgBuilder<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rights::AnySendRight;
+    use crate::{
+        msg::{ool::OolVec, MsgDescOrBodyParser, MsgParser, ParsedMsgDesc},
+        rights::AnySendRight,
+    };
 
     #[test]
     fn test_drop() {
@@ -357,5 +421,60 @@ mod tests {
             header.reply_right,
             Some(AnySendRight::SendOnce(_))
         ));
+    }
+
+    fn check_ool_data(parser: MsgParser, slice: &[u8]) {
+        let (_, parser) = parser.parse_header();
+
+        let MsgDescOrBodyParser::Descriptor(parser) = parser else {
+            panic!("expected a descriptor");
+        };
+
+        let (ParsedMsgDesc::OolData(ool_data), parser) = parser.next() else {
+            panic!("expected an OOL data descriptor");
+        };
+
+        assert_eq!(slice, ool_data.as_slice());
+        assert!(matches!(parser, MsgDescOrBodyParser::Body(_)));
+    }
+
+    #[test]
+    fn test_ool_data_ref() {
+        let mut data = vec![];
+        data.resize(page_size::get_granularity() * 3, 0xAAu8);
+        let slice = &mut data[315..1337 + page_size::get_granularity() * 2];
+        slice.fill(0x55);
+
+        let mut buffer = MsgBuffer::with_capacity(1024);
+        let recv_right = RecvRight::alloc();
+        let send_right = recv_right.make_send();
+
+        let mut builder = MsgBuilder::new(&mut buffer);
+        builder.append_ool_data(slice, CopyKind::Virtual);
+        send_right.send(builder).unwrap();
+
+        let parser = recv_right.recv(&mut buffer).unwrap();
+        check_ool_data(parser, slice);
+    }
+
+    #[test]
+    fn test_ool_data_owned() {
+        let mut reference = vec![];
+        reference.resize(page_size::get_granularity() * 3, 0xAAu8);
+        let slice = &mut reference[315..1337 + page_size::get_granularity() * 2];
+        slice.fill(0x55);
+
+        let data = OolVec::from(reference.as_slice());
+
+        let mut buffer = MsgBuffer::with_capacity(1024);
+        let recv_right = RecvRight::alloc();
+        let send_right = recv_right.make_send();
+
+        let mut builder = MsgBuilder::new(&mut buffer);
+        builder.append_consumed_ool_data(data.into_buf(), CopyKind::Virtual);
+        send_right.send(builder).unwrap();
+
+        let parser = recv_right.recv(&mut buffer).unwrap();
+        check_ool_data(parser, &reference);
     }
 }

@@ -1,11 +1,11 @@
 //! Contains the implementation of the Mach message parser.
 
 use crate::{
-    msg::{buffer::MsgBuffer, MachMsgBits, MsgId},
+    msg::{buffer::MsgBuffer, ool::OolBuf, MachMsgBits, MsgId},
     rights::{AnySendRight, RecvRight, SendOnceRight, SendRight},
 };
 use mach2::{message::*, port::MACH_PORT_NULL};
-use std::mem;
+use std::{mem, ptr, ptr::NonNull};
 
 fn size_for_desc_type(type_: mach_msg_descriptor_type_t) -> usize {
     match type_ {
@@ -54,6 +54,8 @@ pub enum ParsedMsgDesc {
     PortSend(SendRight),
     /// A send once right from a port descriptor.
     PortSendOnce(SendOnceRight),
+    /// An out-of-line data descriptor.
+    OolData(OolBuf),
 }
 
 pub(crate) enum TransmutedMsgDesc<'a> {
@@ -125,10 +127,22 @@ pub(crate) fn next_desc_impl<'buffer>(
             TransmutedMsgDesc::Port(unsafe { anything_from_bytes(desc_bytes) })
         }
         MACH_MSG_OOL_DESCRIPTOR => {
-            TransmutedMsgDesc::Ool(unsafe { anything_from_bytes(desc_bytes) })
+            let ptr = desc_bytes.as_ptr() as *const mach_msg_ool_descriptor_t;
+
+            assert!(ptr.is_aligned_to(mem::align_of::<mach_msg_size_t>()));
+
+            // SAFETY: The alignment is incorrect here actually since there is a 64-bit address in
+            // the structure. The address field has to be read unaligned. The size is checked to be
+            // correct by size_for_desc_type.
+            TransmutedMsgDesc::Ool(unsafe { &*ptr })
         }
         MACH_MSG_OOL_VOLATILE_DESCRIPTOR => {
-            TransmutedMsgDesc::OolVolatile(unsafe { anything_from_bytes(desc_bytes) })
+            let ptr = desc_bytes.as_ptr() as *const mach_msg_ool_descriptor_t;
+
+            assert!(ptr.is_aligned_to(mem::align_of::<mach_msg_size_t>()));
+
+            // SAFETY: See above.
+            TransmutedMsgDesc::OolVolatile(unsafe { &*ptr })
         }
         MACH_MSG_OOL_PORTS_DESCRIPTOR => {
             TransmutedMsgDesc::OolPorts(unsafe { anything_from_bytes(desc_bytes) })
@@ -171,7 +185,23 @@ impl<'buffer> MsgDescParser<'buffer> {
                         _ => unreachable!("invalid disposition value in a port descriptor"),
                     }
                 }
-                TransmutedMsgDesc::Ool(_) | TransmutedMsgDesc::OolVolatile(_) => {
+                TransmutedMsgDesc::Ool(ool_desc) => {
+                    let length: usize = ool_desc.size.try_into().unwrap();
+                    let ptr = match length {
+                        0 => NonNull::dangling(),
+                        _ => {
+                            // SAFETY: This is obviously safe, but required since the alignment may
+                            // be invalid here.
+                            let address =
+                                unsafe { ptr::read_unaligned(ptr::addr_of!(ool_desc.address)) };
+                            NonNull::new(address as *mut u8).unwrap()
+                        }
+                    };
+
+                    // SAFETY: The kernel is trusted to provide a valid memory region here.
+                    ParsedMsgDesc::OolData(unsafe { OolBuf::from_raw_parts(ptr, length) })
+                }
+                TransmutedMsgDesc::OolVolatile(_) => {
                     unimplemented!("OOL and volatile OOL descriptors are not yet supported")
                 }
                 TransmutedMsgDesc::OolPorts(_) => {
