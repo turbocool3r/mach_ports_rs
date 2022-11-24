@@ -8,7 +8,7 @@ use crate::{
         MachMsgBits, MsgId,
     },
     rights::*,
-    traits::{AsRawName, BaseRight, IntoRawName},
+    traits::{AsRawName, BaseRight, BaseSendRight, IntoRawName},
 };
 use mach2::{
     message::*,
@@ -179,22 +179,18 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
 
     /// Consumes a send or a send once right and sets it to be transferred to the receiver as the
     /// reply port when the message is sent.
-    pub fn set_moved_reply_port<T: Into<AnySendRight>>(&mut self, reply_port: T) {
+    pub fn set_moved_reply_port<T, B>(&mut self, reply_port: T)
+    where
+        T: IntoRawName<Base = B>,
+        B: BaseSendRight,
+    {
         self.release_reply_port();
 
-        let reply_port = reply_port.into();
         let header = self.buffer.header_mut();
         let bits = MachMsgBits::from_bits(header.msgh_bits);
-        let local_bits = match reply_port {
-            AnySendRight::Send(send) => {
-                header.msgh_local_port = send.into_raw_name();
-                MACH_MSG_TYPE_MOVE_SEND
-            }
-            AnySendRight::SendOnce(send_once) => {
-                header.msgh_local_port = send_once.into_raw_name();
-                MACH_MSG_TYPE_MOVE_SEND_ONCE
-            }
-        };
+
+        let local_bits = T::Base::MSG_TYPE;
+        header.msgh_local_port = reply_port.into_raw_name();
 
         let new_bits = MachMsgBits::new(bits.complex(), 0, local_bits, bits.voucher());
         header.msgh_bits = new_bits.0;

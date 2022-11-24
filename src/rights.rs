@@ -158,6 +158,8 @@ impl BaseRight for SendRight {
     const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND;
 }
 
+impl BaseSendRight for SendRight {}
+
 /// A wrapper for a Mach port name that holds a send once right to a port.
 #[repr(transparent)]
 #[derive(Debug)]
@@ -223,6 +225,8 @@ impl IntoRawName for SendOnceRight {
 impl BaseRight for SendOnceRight {
     const MSG_TYPE: mach_port_right_t = MACH_MSG_TYPE_MOVE_SEND_ONCE;
 }
+
+impl BaseSendRight for SendOnceRight {}
 
 /// A wrapper for a Mach port name that holds a receive right to a port.
 #[repr(transparent)]

@@ -43,6 +43,14 @@ pub trait BaseRight: IntoRawName + sealed::Sealed {
     const MSG_TYPE: mach_port_right_t;
 }
 
+/// A trait only implemented by the base send right wrappers:
+/// [`SendRight`](../rights/struct.SendRight.html) and
+/// [`SendOnceRight`](../rights/struct.SendOnceRight.html).
+///
+/// This is used in cases where only a send or a send right reference might be accepted (currently
+/// only for setting reply ports in a generic way).
+pub trait BaseSendRight: BaseRight {}
+
 mod sealed {
     use crate::rights::{RecvRight, SendOnceRight, SendRight};
 
