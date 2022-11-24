@@ -9,6 +9,10 @@
 
 use mach2::message::*;
 
+/// A re-export of the `mach_msg_return_t` type, the result type returned by the `mach_msg`
+/// function.
+pub type RawErrorBits = mach_msg_return_t;
+
 macro_rules! def_error_kind {
     (
         $(#[$outer:meta])*
@@ -20,21 +24,24 @@ macro_rules! def_error_kind {
         }
     ) => {
         $(#[$outer])*
+        #[repr(i32)]
         $vis enum $name {
             $(
                 $(#[$inner $($args)*])*
-                $var = $val as isize,
+                $var = $val & !MACH_MSG_MASK,
             )+
+            /// The error code is unexpected, check the raw value of the error.
+            Other,
         }
 
         impl $name {
             #[doc = concat!(
                 "Creates a `", stringify!($name), " from a known error code or returns `None`."
             )]
-            pub const fn from_error_code(code: ::mach2::message::mach_msg_return_t) -> Option<Self> {
+            pub const fn from_error_code(code: RawErrorBits) -> Self {
                 match code {
-                    $($val => Some(Self::$var),)+
-                    _ => None,
+                    $($val => Self::$var,)+
+                    _ => Self::Other,
                 }
             }
         }
@@ -43,6 +50,7 @@ macro_rules! def_error_kind {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 let s = match self {
                     $(Self::$var => stringify!($val),)+
+                    Self::Other => "OTHER",
                 };
                 f.write_str(s)
             }
@@ -135,22 +143,27 @@ macro_rules! def_error {
         #[repr(transparent)]
         #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
         #[doc = $doc]
-        pub struct $name(mach_msg_return_t);
+        pub struct $name(RawErrorBits);
 
         impl $name {
             /// Creates an error from its kind only.
             pub const fn from_kind(kind: $kind) -> Self {
-                Self(kind as mach_msg_return_t)
+                Self(kind as RawErrorBits)
             }
 
             /// Creates an error from its raw value.
-            pub const fn from_bits(bits: mach_msg_return_t) -> Self {
+            pub const fn from_bits(bits: RawErrorBits) -> Self {
                 Self(bits)
             }
 
             /// Returns the error kind of the error.
             pub const fn kind(self) -> $kind {
-                $kind::from_error_code(self.0 & !MACH_MSG_MASK).unwrap()
+                $kind::from_error_code(self.0 & !MACH_MSG_MASK)
+            }
+
+            /// Returns the raw value of the error.
+            pub const fn bits(self) -> RawErrorBits {
+                self.0
             }
 
             /// Returns the VM space flag of the error.
