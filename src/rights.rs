@@ -263,7 +263,7 @@ impl RecvRight {
     }
 
     /// Inserts a send right for the receive right into the current task and wraps the name into a
-    /// `SendRight`.
+    /// [`SendRight`].
     ///
     /// # Panics
     /// This function will panic in case `mach_port_insert_right` returns an error. This should only

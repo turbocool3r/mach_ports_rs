@@ -6,8 +6,6 @@
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
 
-extern crate core;
-
 pub mod msg;
 pub mod rights;
 pub mod traits;

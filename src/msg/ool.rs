@@ -206,7 +206,7 @@ use vm_buf::VmBuf;
 pub struct OolBuf(VmBuf);
 
 impl OolBuf {
-    /// Constructs an `OolBuf` from a raw pointer and a length.
+    /// Constructs an [`OolBuf`] from a raw pointer and a length.
     ///
     /// # Safety
     /// The caller must ensure the pointer and the length represent a valid buffer allocated using
@@ -320,7 +320,7 @@ impl DerefMut for OolBuf {
     }
 }
 
-/// An error returned when an `OolVec` doesn't have enough capacity.
+/// An error returned when an [`OolVec`] doesn't have enough capacity.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[non_exhaustive]
 pub struct NotEnoughCapacity {
@@ -365,7 +365,7 @@ impl OolVec {
     ///
     /// # Panics
     /// This function will panic in these cases:
-    /// 1. The specified capacity is larger than `isize::MAX`.
+    /// 1. The specified capacity is larger than [`isize::MAX`].
     /// 2. A call to `mach_vm_allocate` returns an error.
     #[inline(always)]
     pub fn with_capacity(capacity: usize) -> Self {
@@ -375,7 +375,7 @@ impl OolVec {
         }
     }
 
-    /// Creates an `OolVec` from a pointer, a length and a capacity.
+    /// Creates an [`OolVec`] from a pointer, a length and a capacity.
     ///
     /// # Safety
     /// The caller must ensure the pointer points to a memory region allocated using the Mach VM
@@ -455,7 +455,7 @@ impl OolVec {
         self.len = new_len;
     }
 
-    /// Tries to extend the `OolBuf` with bytes from a byte slice.
+    /// Tries to extend the vector with bytes from a byte slice.
     fn try_extend_from_slice(&mut self, slice: &[u8]) -> Result<(), NotEnoughCapacity> {
         let available_capacity = self.capacity() - self.len;
 
@@ -682,12 +682,22 @@ impl Extend<u8> for OolVec {
     }
 }
 
-/// Creates an `OolVec` from a list of elements and optionally a capacity value.
+/// Creates an [`OolVec`] from a list of elements and optionally a capacity value.
 ///
-/// # Example
+/// # Examples
 /// ```
 /// # use mach_ports::ool_vec;
+/// // creating a vector from a list of elements
+/// let v = ool_vec![1, 2, 3];
 ///
+/// assert_eq!(v.as_slice(), &[1, 2, 3]);
+/// assert_eq!(v.capacity(), 3);
+///
+/// // creating a vector from a list of elements and a capacity value
+/// let v = ool_vec![1, 2, 3; 1024];
+///
+/// assert_eq!(v.as_slice(), &[1, 2, 3]);
+/// assert_eq!(v.capacity(), 1024);
 /// ```
 #[macro_export]
 macro_rules! ool_vec {
@@ -711,10 +721,4 @@ macro_rules! ool_vec {
             v
         }
     });
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_basic() {}
 }

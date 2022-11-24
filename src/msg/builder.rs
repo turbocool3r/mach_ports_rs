@@ -92,7 +92,7 @@ pub enum CopyKind {
 /// reference count. When a message is sent, the receiver gets a reference on the send right and a
 /// name is allocated for the port in its IPC space if there wasn't one before.
 /// * `(append|set)_moved_*` functions consume any of the Mach port name wrappers. The reference
-/// count on the corresponding rights aren't changed, but dropping the `MsgBuilder` or sending the
+/// count on the corresponding rights aren't changed, but dropping the [`MsgBuilder`] or sending the
 /// message will cause the sender to pass one reference on the right to the receiver.
 #[derive(Debug)]
 pub struct MsgBuilder<'a, 'buffer> {
