@@ -1,7 +1,7 @@
 //! Contains the implementation of the Mach message parser.
 
 use crate::{
-    msg::{buffer::MsgBuffer, ool::OolBuf, MachMsgBits, MsgId},
+    msg::{buffer::Buffer, ool::OolBuf, MachMsgBits, MsgId},
     rights::{AnySendRight, RecvRight, SendOnceRight, SendRight},
 };
 use mach2::{message::*, port::MACH_PORT_NULL};
@@ -67,12 +67,12 @@ pub(crate) enum TransmutedMsgDesc<'a> {
 
 /// Message body parser.
 #[derive(Debug)]
-pub struct MsgBodyParser<'buffer> {
-    buffer: &'buffer mut MsgBuffer,
+pub struct BodyParser<'buffer> {
+    buffer: &'buffer mut Buffer,
     offset: mach_msg_size_t,
 }
 
-impl MsgBodyParser<'_> {
+impl BodyParser<'_> {
     /// Returns the message body as a byte slice.
     pub fn body(&self) -> &[u8] {
         let offset = self.offset as usize;
@@ -87,15 +87,15 @@ impl MsgBodyParser<'_> {
 
 /// Either a descriptor or a body parser.
 #[derive(Debug)]
-pub enum MsgDescOrBodyParser<'buffer> {
+pub enum DescOrBodyParser<'buffer> {
     /// A descriptor parser.
-    Descriptor(MsgDescParser<'buffer>),
+    Descriptor(DescParser<'buffer>),
     /// A body parser.
-    Body(MsgBodyParser<'buffer>),
+    Body(BodyParser<'buffer>),
 }
 
 pub(crate) fn next_desc_impl<'buffer>(
-    buffer: &'buffer mut MsgBuffer,
+    buffer: &'buffer mut Buffer,
     offset: &mut mach_msg_size_t,
     received: bool,
 ) -> TransmutedMsgDesc<'buffer> {
@@ -157,15 +157,15 @@ pub(crate) fn next_desc_impl<'buffer>(
 
 /// A Mach message parser received after parsing the header.
 #[derive(Debug)]
-pub struct MsgDescParser<'buffer> {
-    buffer: Option<&'buffer mut MsgBuffer>,
+pub struct DescParser<'buffer> {
+    buffer: Option<&'buffer mut Buffer>,
     count: mach_msg_size_t,
     offset: mach_msg_size_t,
 }
 
-impl<'buffer> MsgDescParser<'buffer> {
+impl<'buffer> DescParser<'buffer> {
     /// Parses the next descriptor from the message.
-    pub fn next(mut self) -> (ParsedMsgDesc, MsgDescOrBodyParser<'buffer>) {
+    pub fn next(mut self) -> (ParsedMsgDesc, DescOrBodyParser<'buffer>) {
         assert!(self.count > 0);
 
         let parsed_desc =
@@ -211,9 +211,9 @@ impl<'buffer> MsgDescParser<'buffer> {
         self.count -= 1;
 
         let parser = if self.count > 0 {
-            MsgDescOrBodyParser::Descriptor(self)
+            DescOrBodyParser::Descriptor(self)
         } else {
-            MsgDescOrBodyParser::Body(MsgBodyParser {
+            DescOrBodyParser::Body(BodyParser {
                 buffer: self.buffer.take().unwrap(),
                 offset: mem::replace(&mut self.offset, 0),
             })
@@ -223,7 +223,7 @@ impl<'buffer> MsgDescParser<'buffer> {
     }
 }
 
-impl Drop for MsgDescParser<'_> {
+impl Drop for DescParser<'_> {
     fn drop(&mut self) {
         // Iterate through all remaining descriptors and free resources.
         while self.count > 0 {
@@ -256,7 +256,7 @@ impl Drop for MsgDescParser<'_> {
     }
 }
 
-fn parse_header_impl(buffer: &mut MsgBuffer) -> (ParsedMsgHdr, MsgDescOrBodyParser) {
+fn parse_header_impl(buffer: &mut Buffer) -> (ParsedMsgHdr, DescOrBodyParser) {
     let header = buffer.header_mut();
     let bits = MachMsgBits(header.msgh_bits);
     let id = header.msgh_id;
@@ -287,13 +287,13 @@ fn parse_header_impl(buffer: &mut MsgBuffer) -> (ParsedMsgHdr, MsgDescOrBodyPars
 
     let count = buffer.descriptors_count();
     let desc_parser = if count > 0 {
-        MsgDescOrBodyParser::Descriptor(MsgDescParser {
+        DescOrBodyParser::Descriptor(DescParser {
             buffer: Some(buffer),
             count,
             offset: mem::size_of::<mach_msg_size_t>() as mach_msg_size_t,
         })
     } else {
-        MsgDescOrBodyParser::Body(MsgBodyParser { buffer, offset: 0 })
+        DescOrBodyParser::Body(BodyParser { buffer, offset: 0 })
     };
 
     let parsed_hdr = ParsedMsgHdr {
@@ -308,11 +308,11 @@ fn parse_header_impl(buffer: &mut MsgBuffer) -> (ParsedMsgHdr, MsgDescOrBodyPars
 /// A Mach message parser that can parse Mach message headers and construct subsequent parsers.
 #[repr(transparent)]
 #[derive(Debug)]
-pub struct MsgParser<'buffer>(Option<&'buffer mut MsgBuffer>);
+pub struct MsgParser<'buffer>(Option<&'buffer mut Buffer>);
 
 impl<'buffer> MsgParser<'buffer> {
     #[inline(always)]
-    pub(crate) fn new(buffer: &'buffer mut MsgBuffer) -> Self {
+    pub(crate) fn new(buffer: &'buffer mut Buffer) -> Self {
         unsafe {
             buffer.set_len(buffer.header().msgh_size);
         }
@@ -322,7 +322,7 @@ impl<'buffer> MsgParser<'buffer> {
 
     /// Parses the header of the message and returns the parsed header and either a descriptor or
     /// a body parser depending on whether there are descriptors in the message.
-    pub fn parse_header(mut self) -> (ParsedMsgHdr, MsgDescOrBodyParser<'buffer>) {
+    pub fn parse_header(mut self) -> (ParsedMsgHdr, DescOrBodyParser<'buffer>) {
         let buffer = self.0.take().unwrap();
         parse_header_impl(buffer)
     }

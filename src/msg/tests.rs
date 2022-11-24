@@ -7,24 +7,24 @@ macro_rules! check_msg {
 
             $(
                 let parser = match parser {
-                    $crate::msg::MsgDescOrBodyParser::Descriptor(desc) => {
+                    $crate::msg::DescOrBodyParser::Descriptor(desc) => {
                         let (desc, parser) = desc.next();
 
                         assert!(matches!(desc, $crate::msg::ParsedMsgDesc::$desc(_)));
 
                         parser
                     }
-                    $crate::msg::MsgDescOrBodyParser::Body(_) => {
+                    $crate::msg::DescOrBodyParser::Body(_) => {
                         panic!("expected one more descriptor");
                     }
                 };
             )+
 
             match parser {
-                $crate::msg::MsgDescOrBodyParser::Descriptor(_) => {
+                $crate::msg::DescOrBodyParser::Descriptor(_) => {
                     panic!("expected a body parser");
                 }
-                $crate::msg::MsgDescOrBodyParser::Body(parser) => {
+                $crate::msg::DescOrBodyParser::Body(parser) => {
                     assert_eq!(parser.body(), $body);
                 }
             }
@@ -37,8 +37,8 @@ fn test_send_recv() {
     let right = RecvRight::alloc();
     let send_right = right.make_send();
 
-    let mut buffer = MsgBuffer::with_capacity(4096);
-    let mut builder = MsgBuilder::new(&mut buffer);
+    let mut buffer = Buffer::with_capacity(4096);
+    let mut builder = Builder::new(&mut buffer);
     builder.append_inline_data(b"test");
     builder.append_copied_send_right(&send_right);
     builder.append_made_send_right(&right, true);
@@ -55,8 +55,8 @@ fn test_send_consumed_recv() {
     let right = RecvRight::alloc();
     let send_right = right.make_send();
 
-    let mut buffer = MsgBuffer::with_capacity(4096);
-    let mut builder = MsgBuilder::new(&mut buffer);
+    let mut buffer = Buffer::with_capacity(4096);
+    let mut builder = Builder::new(&mut buffer);
     builder.append_moved_right(right);
     send_right.send(builder).unwrap();
 }

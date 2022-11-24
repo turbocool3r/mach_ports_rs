@@ -1,8 +1,8 @@
-//! Contains the implementation of the `MsgBuilder` structure used to build Mach messages.
+//! Contains the implementation of the `Builder` structure used to build Mach messages.
 
 use crate::{
     msg::{
-        buffer::MsgBuffer,
+        buffer::Buffer,
         ool::OolBuf,
         parser::{self, TransmutedMsgDesc},
         MachMsgBits, MsgId,
@@ -92,18 +92,18 @@ pub enum CopyKind {
 /// reference count. When a message is sent, the receiver gets a reference on the send right and a
 /// name is allocated for the port in its IPC space if there wasn't one before.
 /// * `(append|set)_moved_*` functions consume any of the Mach port name wrappers. The reference
-/// count on the corresponding rights aren't changed, but dropping the [`MsgBuilder`] or sending the
+/// count on the corresponding rights aren't changed, but dropping the [`Builder`] or sending the
 /// message will cause the sender to pass one reference on the right to the receiver.
 #[derive(Debug)]
-pub struct MsgBuilder<'a, 'buffer> {
-    buffer: &'buffer mut MsgBuffer,
+pub struct Builder<'a, 'buffer> {
+    buffer: &'buffer mut Buffer,
     inline_data_off: mach_msg_size_t,
     _marker: PhantomData<&'a ()>,
 }
 
-impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
+impl<'a, 'buffer> Builder<'a, 'buffer> {
     /// Creates a new message builder.
-    pub fn new(buffer: &'buffer mut MsgBuffer) -> Self {
+    pub fn new(buffer: &'buffer mut Buffer) -> Self {
         Self {
             buffer,
             inline_data_off: 0,
@@ -137,10 +137,10 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
     ///
     /// # Example
     /// ```
-    /// # use mach_ports::{msg::{MsgBuilder, MsgBuffer}, rights::RecvRight};
+    /// # use mach_ports::{msg::{Builder, Buffer}, rights::RecvRight};
     /// # let recv_right = RecvRight::alloc();
-    /// # let mut buffer = MsgBuffer::with_capacity(1024);
-    /// # let mut builder = MsgBuilder::new(&mut buffer);
+    /// # let mut buffer = Buffer::with_capacity(1024);
+    /// # let mut builder = Builder::new(&mut buffer);
     /// // Set the reply port right to be a send once right.
     /// builder.set_made_reply_port(&recv_right, true);
     ///
@@ -328,7 +328,7 @@ impl<'a, 'buffer> MsgBuilder<'a, 'buffer> {
     }
 }
 
-impl Drop for MsgBuilder<'_, '_> {
+impl Drop for Builder<'_, '_> {
     fn drop(&mut self) {
         drop_header(self.buffer.header_mut());
 
@@ -376,15 +376,15 @@ impl Drop for MsgBuilder<'_, '_> {
 mod tests {
     use super::*;
     use crate::{
-        msg::{ool::OolVec, MsgDescOrBodyParser, MsgParser, ParsedMsgDesc},
+        msg::{ool::OolVec, DescOrBodyParser, MsgParser, ParsedMsgDesc},
         rights::AnySendRight,
     };
 
     #[test]
     fn test_drop() {
-        let mut buffer = MsgBuffer::with_capacity(1024);
+        let mut buffer = Buffer::with_capacity(1024);
         let right = RecvRight::alloc();
-        let mut builder = MsgBuilder::new(&mut buffer);
+        let mut builder = Builder::new(&mut buffer);
         builder.append_made_send_right(&right, true);
         builder.append_moved_right(RecvRight::alloc());
         builder.append_inline_data(b"0123456");
@@ -393,12 +393,12 @@ mod tests {
 
     #[test]
     fn test_reply_port_send() {
-        let mut buffer = MsgBuffer::with_capacity(1024);
+        let mut buffer = Buffer::with_capacity(1024);
         let recv_right = RecvRight::alloc();
         let send_right = recv_right.make_send();
         let reply_right = RecvRight::alloc();
 
-        let mut builder = MsgBuilder::new(&mut buffer);
+        let mut builder = Builder::new(&mut buffer);
         builder.set_made_reply_port(&reply_right, false);
         send_right.send(builder).unwrap();
 
@@ -410,12 +410,12 @@ mod tests {
 
     #[test]
     fn test_reply_port_send_once() {
-        let mut buffer = MsgBuffer::with_capacity(1024);
+        let mut buffer = Buffer::with_capacity(1024);
         let recv_right = RecvRight::alloc();
         let send_right = recv_right.make_send();
         let reply_right = RecvRight::alloc();
 
-        let mut builder = MsgBuilder::new(&mut buffer);
+        let mut builder = Builder::new(&mut buffer);
         builder.set_made_reply_port(&reply_right, true);
         send_right.send(builder).unwrap();
 
@@ -431,7 +431,7 @@ mod tests {
     fn check_ool_data(parser: MsgParser, slice: &[u8]) {
         let (_, parser) = parser.parse_header();
 
-        let MsgDescOrBodyParser::Descriptor(parser) = parser else {
+        let DescOrBodyParser::Descriptor(parser) = parser else {
             panic!("expected a descriptor");
         };
 
@@ -440,7 +440,7 @@ mod tests {
         };
 
         assert_eq!(slice, ool_data.as_slice());
-        assert!(matches!(parser, MsgDescOrBodyParser::Body(_)));
+        assert!(matches!(parser, DescOrBodyParser::Body(_)));
     }
 
     #[test]
@@ -450,11 +450,11 @@ mod tests {
         let slice = &mut data[315..1337 + page_size::get_granularity() * 2];
         slice.fill(0x55);
 
-        let mut buffer = MsgBuffer::with_capacity(1024);
+        let mut buffer = Buffer::with_capacity(1024);
         let recv_right = RecvRight::alloc();
         let send_right = recv_right.make_send();
 
-        let mut builder = MsgBuilder::new(&mut buffer);
+        let mut builder = Builder::new(&mut buffer);
         builder.append_ool_data(slice, CopyKind::Virtual);
         send_right.send(builder).unwrap();
 
@@ -471,11 +471,11 @@ mod tests {
 
         let data = OolVec::from(reference.as_slice());
 
-        let mut buffer = MsgBuffer::with_capacity(1024);
+        let mut buffer = Buffer::with_capacity(1024);
         let recv_right = RecvRight::alloc();
         let send_right = recv_right.make_send();
 
-        let mut builder = MsgBuilder::new(&mut buffer);
+        let mut builder = Builder::new(&mut buffer);
         builder.append_consumed_ool_data(data.into_buf(), CopyKind::Virtual);
         send_right.send(builder).unwrap();
 

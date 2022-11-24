@@ -12,7 +12,7 @@
 //! send right.
 
 use crate::{
-    msg::{MsgBuffer, MsgBuilder, MsgParser, RecvError, SendError},
+    msg::{Buffer, Builder, MsgParser, RecvError, SendError},
     traits::*,
 };
 use mach2::{
@@ -52,7 +52,7 @@ fn mod_refs_wrapper(
     result
 }
 
-fn send_impl(name: mach_port_t, msg: MsgBuilder, bits: mach_msg_bits_t) -> Result<(), SendError> {
+fn send_impl(name: mach_port_t, msg: Builder, bits: mach_msg_bits_t) -> Result<(), SendError> {
     let mut msg = ManuallyDrop::new(msg);
 
     msg.set_raw_remote_port(name, bits);
@@ -94,14 +94,14 @@ impl SendRight {
         mod_refs_wrapper(self.0, MACH_PORT_RIGHT_SEND, delta)
     }
 
-    /// Sends a message built by a [`MsgBuilder`].
+    /// Sends a message built by a [`Builder`].
     ///
     /// This function is a safe wrapper around the `mach_msg` API.
     ///
     /// # Port right references
     /// This method consumes all moved port right references that the message holds no matter if the
     /// message transfer is successful or not.
-    pub fn send(&self, msg: MsgBuilder) -> Result<(), SendError> {
+    pub fn send(&self, msg: Builder) -> Result<(), SendError> {
         send_impl(self.0, msg, MACH_MSG_TYPE_COPY_SEND)
     }
 }
@@ -177,14 +177,14 @@ impl SendOnceRight {
         mod_refs_wrapper(self.0, MACH_PORT_RIGHT_SEND_ONCE, delta)
     }
 
-    /// Sends a message built by a [`MsgBuilder`] and consumes the send once right.
+    /// Sends a message built by a [`Builder`] and consumes the send once right.
     ///
     /// This function is a safe wrapper around the `mach_msg` API.
     ///
     /// # Port right references
     /// This method consumes all moved port right references that the message holds no matter if the
     /// message transfer is successful or not.
-    pub fn send(self, msg: MsgBuilder) -> Result<(), SendError> {
+    pub fn send(self, msg: Builder) -> Result<(), SendError> {
         let name = ManuallyDrop::new(self);
         send_impl(name.0, msg, MACH_MSG_TYPE_MOVE_SEND_ONCE)
     }
@@ -287,7 +287,7 @@ impl RecvRight {
     /// Receives a Mach message into the specified buffer.
     pub fn recv<'buffer>(
         &self,
-        buffer: &'buffer mut MsgBuffer,
+        buffer: &'buffer mut Buffer,
     ) -> Result<MsgParser<'buffer>, RecvError> {
         let data = buffer.as_slice();
         let result = unsafe {

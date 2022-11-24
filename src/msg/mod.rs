@@ -8,8 +8,8 @@ pub mod parser;
 #[cfg(test)]
 mod tests;
 
-pub use buffer::MsgBuffer;
-pub use builder::MsgBuilder;
+pub use buffer::Buffer;
+pub use builder::Builder;
 pub use error::{RecvError, RecvErrorKind, SendError, SendErrorKind};
 use mach2::{message::*, port::mach_port_right_t};
 pub use parser::*;

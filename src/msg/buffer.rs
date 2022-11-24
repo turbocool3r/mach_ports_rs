@@ -1,4 +1,4 @@
-//! Provides the [`MsgBuffer`] structure used to represent a buffer for Mach messages.
+//! Provides the [`Buffer`] structure used to represent a buffer for Mach messages.
 
 use crate::msg::MachMsgBits;
 use mach2::message::{mach_msg_header_t, mach_msg_size_t};
@@ -21,13 +21,13 @@ pub(crate) struct MsgData<T: ?Sized> {
 /// This structure isn't designed to be aware of the Mach message format and exists to allow reusing
 /// memory when communicating using Mach messages.
 #[derive(Debug)]
-pub struct MsgBuffer {
+pub struct Buffer {
     ptr: NonNull<MsgData<[u8; 0]>>,
     len: mach_msg_size_t,
     capacity: mach_msg_size_t,
 }
 
-impl MsgBuffer {
+impl Buffer {
     fn layout_for_capacity(capacity: mach_msg_size_t) -> Layout {
         let (layout, _) = Layout::new::<mach_msg_header_t>()
             .extend(Layout::array::<u8>(capacity.try_into().unwrap()).unwrap())
@@ -188,7 +188,7 @@ impl MsgBuffer {
         self.len += inserted_len;
     }
 
-    /// Resizes the buffer and
+    /// Sets a new length for the buffer without performing any checks.
     pub(crate) unsafe fn set_len(&mut self, new_len: mach_msg_size_t) {
         assert!(new_len <= self.capacity);
 
@@ -196,7 +196,7 @@ impl MsgBuffer {
     }
 }
 
-impl Drop for MsgBuffer {
+impl Drop for Buffer {
     fn drop(&mut self) {
         unsafe {
             alloc::dealloc(
